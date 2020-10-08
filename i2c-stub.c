@@ -18,17 +18,19 @@
 #include <linux/bcd.h>
 
 #define CHIP_ADDR 0x24
-
+#define FIRMWARE_VERSION 0x14
 #define N_REG 256
 
 #define I2C_MSG_READ (msg->flags & I2C_M_RD)
 
 enum stub_cmds {
 	ID = 0,
+	GET_FIRMWARE_VERSION = 1,
 };
 
 struct stub_chip {
 	u16 registers[N_REG];
+	u16 firmware_version;
 };
 struct stub_chip chip;
 
@@ -77,6 +79,13 @@ static int stub_handle_cmds(struct i2c_adapter *adap, struct i2c_msg *msg,
 			request->buf_response[2] = bin2bcd(adap->nr);
 
 			break;
+
+		case GET_FIRMWARE_VERSION:
+			request->cmd = msg->buf[0];
+			request->buf_len = 1;
+
+			request->buf_response[0] = chip.firmware_version;
+			break;
 		default:
 			dev_dbg(&adap->dev, "Unsupported command\n");
 			ret = -EOPNOTSUPP;
@@ -107,7 +116,7 @@ static int stub_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	int i;
 	int ret = 0;
 
-
+	request.buf_len = 0;
 	for (i = 0; i < num; i++) {
 		ret = stub_handle_msg(adap, &msgs[i], &request);
 		if (ret < 0)
@@ -143,6 +152,7 @@ static int __init i2c_stub_init(void)
 	pr_info("Virtual chip at 0x%02x\n", CHIP_ADDR);
 
 	memset(chip.registers, 0, sizeof(chip.registers));
+	chip.firmware_version = FIRMWARE_VERSION;
 	ret = i2c_add_adapter(&stub_adapter);
 
 	return ret;
